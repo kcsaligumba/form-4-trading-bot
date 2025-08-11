@@ -30,8 +30,8 @@ A Python-based trading bot that **monitors SEC Form-4 filings** in near real-tim
 
 ## Installation
 ```bash
-git clone https://github.com/yourusername/sec-form4-bot.git
-cd sec-form4-bot
+git clone https://github.com/kcsaligumba/form-4-trading-bot.git
+cd form-4-trading-bot
 
 python -m venv .venv
 # Activate venv
@@ -42,6 +42,7 @@ source .venv/bin/activate
 
 pip install --upgrade pip
 pip install -r requirements.txt
+```
 
 ---
 

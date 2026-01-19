@@ -11,10 +11,26 @@ def find_ownership_xml_url(dir_url: str) -> Optional[str]:
     if r.status_code != 200:
         return None
     data = r.json()
-    for f in data.get("directory", {}).get("item", []):
-        name = f.get("name", "").lower()
-        if name.endswith("ownership.xml"):
-            return dir_url.rstrip("/") + "/" + f["name"]
+    items = data.get("directory", {}).get("item", [])
+    preferred = []
+    fallback = []
+    for f in items:
+        name = f.get("name", "")
+        lname = name.lower()
+        if not lname.endswith(".xml"):
+            continue
+        if lname.endswith(("xsl.xml", "xsd.xml")):
+            continue
+        if lname in ("filingsummary.xml",):
+            continue
+        if any(k in lname for k in ("ownership", "form4", "primary")):
+            preferred.append(name)
+        else:
+            fallback.append(name)
+    if preferred:
+        return dir_url.rstrip("/") + "/" + preferred[0]
+    if fallback:
+        return dir_url.rstrip("/") + "/" + fallback[0]
     return None
 
 def fetch_ownership_xml(xml_url: str) -> bytes:

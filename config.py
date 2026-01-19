@@ -11,4 +11,4 @@ MIN_PCT_ADV = float(os.getenv("MIN_PCT_ADV", "10"))
 PRIORITY_TITLES = tuple(s.strip().lower() for s in os.getenv(
     "PRIORITY_TITLES", "ceo,cfo,chief executive,chief financial"
 ).split(","))
-SCORE_ALERT_THRESHOLD=6
+SCORE_ALERT_THRESHOLD=4

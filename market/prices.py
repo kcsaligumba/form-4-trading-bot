@@ -10,6 +10,9 @@ def get_adv_usd(symbol: str, lookback_days: int = 30) -> Optional[float]:
         dv = (df["Close"] * df["Volume"]).tail(lookback_days)
         if dv.empty:
             return None
-        return float(dv.mean())
+        mean_dv = dv.mean()
+        if hasattr(mean_dv, "iloc"):
+            return float(mean_dv.iloc[0])
+        return float(mean_dv)
     except Exception:
         return None

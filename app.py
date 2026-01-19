@@ -1,4 +1,5 @@
 import time
+import os
 import argparse
 from datetime import datetime
 from loguru import logger
@@ -14,7 +15,7 @@ from market.prices import get_adv_usd
 from features.engineer import compute_features
 from alerts.discord import send_discord_alert
 
-def process_once():
+def process_once(alert_all: bool = False):
     db = SessionLocal()
     try:
         cleanup_watchlist(db)
@@ -77,7 +78,8 @@ def process_once():
                 db.commit()
 
                 # Alert & watchlist
-                if rec.score >= SCORE_ALERT_THRESHOLD and rec.transaction_code == "P":
+                should_alert = alert_all or (rec.score >= SCORE_ALERT_THRESHOLD and rec.transaction_code == "P")
+                if should_alert:
                     send_discord_alert({
                         "symbol": symbol,
                         "transaction_code": rec.transaction_code,
@@ -89,17 +91,18 @@ def process_once():
                         "documents_url": filing.documents_url,
                         "score": rec.score
                     })
-                    add_to_watchlist(db, symbol, days=10)
+                    if not alert_all and rec.transaction_code == "P":
+                        add_to_watchlist(db, symbol, days=10)
 
     finally:
         db.close()
 
-def main():
+def main(alert_all: bool = False):
     init_db()
     logger.info("Starting SEC Form-4 bot…")
-    process_once()  # run immediately
+    process_once(alert_all=alert_all)  # run immediately
     sched = BackgroundScheduler(timezone="UTC")
-    sched.add_job(process_once, "interval", seconds=POLL_INTERVAL_SECONDS, max_instances=1, coalesce=True)
+    sched.add_job(process_once, "interval", seconds=POLL_INTERVAL_SECONDS, max_instances=1, coalesce=True, kwargs={"alert_all": alert_all})
     sched.start()
     try:
         while True:
@@ -113,6 +116,16 @@ if __name__ == "__main__":
         "--test-alert",
         action="store_true",
         help="Send a simulated high-priority insider trade alert to Discord and exit."
+    )
+    parser.add_argument(
+        "--reset-db",
+        action="store_true",
+        help="Delete data.db before starting (forces reprocessing)."
+    )
+    parser.add_argument(
+        "--alert-all",
+        action="store_true",
+        help="Send Discord alerts for every parsed transaction (debugging)."
     )
     args = parser.parse_args()
 
@@ -135,15 +148,13 @@ if __name__ == "__main__":
         print("✅ Test alert sent! Check your Discord channel.")
         exit(0)
 
+    if args.reset_db:
+        db_path = os.path.join(os.getcwd(), "data.db")
+        if os.path.exists(db_path):
+            os.remove(db_path)
+            logger.info("Deleted data.db for a fresh run.")
+        else:
+            logger.info("data.db not found; starting fresh.")
+
     # Normal run
-    init_db()
-    logger.info("Starting SEC Form-4 bot…")
-    process_once()
-    sched = BackgroundScheduler(timezone="UTC")
-    sched.add_job(process_once, "interval", seconds=POLL_INTERVAL_SECONDS, max_instances=1, coalesce=True)
-    sched.start()
-    try:
-        while True:
-            time.sleep(3600)
-    except KeyboardInterrupt:
-        logger.info("Shutting down…")
+    main(alert_all=args.alert_all)
